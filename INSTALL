@@ -1,0 +1,17 @@
+Steps to install (requires CMake):
+
+[..navigate to repeatseq directory..]
+
+(1) download bamtools, place in repeatseq/ in directory named "bamtools" (https://github.com/pezmaster31/bamtools)
+(2) download fastahack, place in repeatseq/ in directory named "fastahack" (https://github.com/ekg/fastahack)
+
+(3) build bamtools
+$ mkdir bamtools/build
+$ cd bamtools/build/
+$ cmake ..
+$ make
+
+(4) build repeatseq
+$ cd ../..
+$ make
+
