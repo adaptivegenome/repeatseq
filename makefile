@@ -1,5 +1,4 @@
 # $* is prefix shared by target and dependent;  $@ is name of target file
-
 CFLAGS = -c -O3 -Ibamtools/src
 OBJS= repeatseq.o structures.o CLParse.o
 NAME= repeatseq
@@ -11,7 +10,6 @@ $(NAME): $(OBJS)
 #	file with second suffix
 	
 .cpp.o:
-	g++ $(CFLAGS) $*.cpp
-	
+	g++ $(CFLAGS) $*.cpp	
 clean:
 	rm *.o

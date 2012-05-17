@@ -6,9 +6,9 @@
  This .cpp contains functions: 
   (1) main() - Parse command line options, iterate line by line through the TRF file (calling 
                print_output() on each region).
- 
+               
   (2) print_output() - This function is called for each repeat in the repeat file, and 
-					   handles the calling of other functions to determine genotype and print 
+		       handles the calling of other functions to determine genotype and print 
                        data to files.
 
   (3) parseCigar() - Uses CIGAR sequence to align read with reference sequence.
@@ -17,9 +17,7 @@
                         likelihood.
  
   (5) getVCF() - print variant record to VCF file.
- 
 */
-
 
 #include "repeatseq.h"
 #include <algorithm>
@@ -85,8 +83,7 @@ int main(int argc, char* argv[]){
 		cout << endl << exOutput << endl;
 		printArguments();
 		return 0;
-	}
-	
+	}	
 }
 
 inline string parseCigar(stringstream &cigarSeq, string &alignedSeq, string &QS, int alignStart, int refStart, int LR_CHARS_TO_PRINT, double &avgBQ){

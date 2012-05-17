@@ -3,23 +3,20 @@ RepeatSeq v0.5.0
 1. Introduction
 RepeatSeq is a program designed to genotype microsatellites on a genome-wide scale.
 
-
 2. Setup and Installation
 see INSTALL for install instructions
-
 
 3. Required Input
 RepeatSeq requires a BAM file, a FASTA file, and a region file as the minimal parameters. 
 
 **see pdf documentation for more information**
 
-
 4. Optional Input
 
 The user to specify a number of command-line options to customize the behavior of RepeatSeq:
 
 Command-line Options: 
-	-r   	   use only a specific read length or range of read lengths (e.g. LENGTH or MIN:MAX)
+	-r   	    use only a specific read length or range of read lengths (e.g. LENGTH or MIN:MAX)
 	-L          required number of reference matching bases BEFORE the repeat [3]
 	-R          required number of reference matching bases AFTER the repeat [3]
 	-M          minimum mapping quality for a read to be used for allele determination
@@ -31,7 +28,6 @@ Command-line Options:
 	-calls      write .calls file (**see pdf documentation for more information**)
 	-t          include user-defined tag in the output filename
 	-o          number of flanking bases to output from each read
-
 
 5. Running RepeatSeq
 
