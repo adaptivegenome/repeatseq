@@ -26,7 +26,7 @@ vector<string> insertionsQS;
 double log_factorial[100000] = {};
 BamReader reader;
 ofstream oFile, callsFile, vcfFile;
-string VERSION = "0.5.2";
+string VERSION = "0.5.3";
 
 int main(int argc, char* argv[]){	
 	try{
@@ -63,7 +63,8 @@ int main(int argc, char* argv[]){
 		
 		//open BamReader object:
 		if (!reader.Open(bam_file)){ throw "Could not open BAM file.."; }
-		
+		if (!reader.OpenIndex(bam_index_file)){ throw "Could not open BAM index file.."; }
+
 		//open input & output filestreams:
 		if (settings.makeRepeatseqFile){ oFile.open(output_filename.c_str()); }
 	 	if (settings.makeCallsFile){ callsFile.open(calls_filename.c_str()); }
@@ -345,8 +346,10 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 	
 	string vcfPrint;
 	
+	//cout << "trying " << target.startSeq << ":" << target.startPos - 1 << "-" << target.stopPos - 1 << endl;
 	// iterate through alignments in this region,
 	while (reader.GetNextAlignment(al)) {
+		//cout << " found\n";
 		insertions.clear();
 		insertionsQS.clear();
 		ssPrint.str("");
@@ -369,7 +372,11 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 		//run parseCigar:
 		double avgBQ;
 		PreAlignedPost = parseCigar(cigarSeq, al.QueryBases, al.Qualities, al.Position + 1, target.startPos, settings.LR_CHARS_TO_PRINT, avgBQ);
-		if (PreAlignedPost == ""){ continue; } //If an 'N' or other problem was found
+		if (PreAlignedPost == ""){ 
+			//If an 'N' or other problem was found
+			cout << "N found-- Possible Error!\n";
+			continue; 
+		} 
 		
 		//adjust for d's
 		for (int a = PreAlignedPost.find('d',0); a!=-1; a=PreAlignedPost.find('d',0)) {
