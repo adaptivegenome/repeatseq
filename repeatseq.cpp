@@ -1017,7 +1017,7 @@ double retSumFactOverIndFact(int a, int b, int c){
 
 string getVCF(string alignment, string reference, string chr, int start, char precBase, bool homozygous, VCF_INFO info){
 	stringstream vcf;
-	int begin, end = -1;
+	int begin, end = -1, bothInsOffset = 0;
 	
 	//assumes alignment & reference are the same length..
 	for(int index = alignment.length()-1; index >= 0; --index){
@@ -1027,7 +1027,8 @@ string getVCF(string alignment, string reference, string chr, int start, char pr
 				while (((alignment[index] != reference[index]) || alignment[index] == '-') && index >= 0){ index -= 1; }
 				begin = index;
 				while (index >= 0){
-					if (reference[index] == '-' && alignment[index] != '-') begin -= 1;
+					if (reference[index] == '-' && alignment[index] != '-'){ begin -= 1; }
+					else if (reference[index] == '-' && alignment[index] == '-'){ bothInsOffset += 1; }
 					index -= 1;
 				}
 				break;
@@ -1055,7 +1056,7 @@ string getVCF(string alignment, string reference, string chr, int start, char pr
 	alignment.erase( std::remove(alignment.begin(), alignment.end(), '-'), alignment.end() );
 	
 	vcf << chr << '\t';
-	vcf << start << '\t';
+	vcf << start-bothInsOffset << '\t';
 	vcf << "." << '\t'; //ID
 	vcf << reference << '\t';
 	vcf << alignment << '\t';
