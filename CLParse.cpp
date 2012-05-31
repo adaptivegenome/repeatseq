@@ -1,3 +1,7 @@
+//*----------------------------------------------------------------------------------------*
+//*RepeatSeq is available through the Virginia Tech non-commerical license.                *
+//*For more details on the license and use, see license.txt included in this distribution. *
+//*----------------------------------------------------------------------------------------*
 // Command-line parsing & error reporting module
 // 
 
