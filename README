@@ -1,15 +1,15 @@
 RepeatSeq v0.5.0
 
 1. Introduction
-RepeatSeq is a program designed to genotype microsatellites on a genome-wide scale.
+RepeatSeq determines genotypes for microsatellite repeats in high-throughput sequencing data. RepeatSeq is available
+through the Virginia Tech non-commerical license. For more details on the license and use, see license.txt included in
+this distribution.
 
 2. Setup and Installation
-see INSTALL for install instructions
+See INSTALL for install instructions
 
 3. Required Input
 RepeatSeq requires a BAM file, a FASTA file, and a region file as the minimal parameters. 
-
-**see pdf documentation for more information**
 
 4. Optional Input
 
@@ -33,4 +33,4 @@ Command-line Options:
 
 Usage: repeatseq [options] <in.bam> <in.fasta> <in.regions>,
 
-if an improper command line option is found, RepeatSeq will exit and print usage information.
+If an improper command line option is found, RepeatSeq will exit and print usage information.
