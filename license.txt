@@ -1,6 +1,6 @@
 Non-Commercial Purpose License
 
-Virginia Polytechnic Institute and State University (Virginia Tech) owns the Open Genomics Engine (OpenGE) software and its associated documentation (“Software”).  You should carefully read the following terms and conditions before using this software.  Your use of this Software indicates your acceptance of this license agreement and all terms and conditions. 
+Virginia Polytechnic Institute and State University (Virginia Tech) owns the RepeatSeq software and its associated documentation (“Software”).  You should carefully read the following terms and conditions before using this software.  Your use of this Software indicates your acceptance of this license agreement and all terms and conditions. 
 
 You are hereby licensed to use the Software for Non-Commercial Purpose only.  Non-Commercial Purpose means the use of the Software solely for research.  Non-Commercial Purpose excludes, without limitation, any use of the Software, as part of, or in any way in connection with a product or service which is sold, offered for sale, licensed, leased, loaned, or rented.  Licensee agrees not to reverse compiler, reverse engineer or reverse assemble all or any portion of the Software; distribute or transfer Software to third parties; or assign or sublicense the Software.  Permission to use, copy, modify, and distribute this compilation for Non-Commercial Purpose is hereby granted without fee, subject to the following terms of this license.  
 
