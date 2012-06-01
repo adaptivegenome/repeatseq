@@ -5,6 +5,14 @@ RepeatSeq determines genotypes for microsatellite repeats in high-throughput seq
 through the Virginia Tech non-commerical license. For more details on the license and use, see license.txt included in
 this distribution.
 
+If you use this code, please cite our manuscript:
+
+J. Fondon III, A. Martin, S. Richards, R.A. Gibbs, and D. Mittelman (2012) Analysis of microsatellite variation in 
+drosophila melanogaster with population-scale genome sequencing. PLoS One, 7(3): e33036.
+
+PubMed Link:
+http://www.ncbi.nlm.nih.gov/pubmed/22427938
+
 2. Setup and Installation
 See INSTALL for install instructions
 
