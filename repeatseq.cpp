@@ -100,8 +100,6 @@ int main(int argc, char* argv[]){
 			cout <<  "Fasta index file not found, creating...";
 			buildFastaIndex(fasta_file);
 		}
-		FastaReference* fr = new FastaReference();
-		fr->open(fasta_file);
 
 		//open input & output filestreams:
 		if (settings.makeRepeatseqFile){ oFile.open(output_filename.c_str()); }
@@ -127,9 +125,10 @@ int main(int argc, char* argv[]){
             worker_data_t & data = *(thread_worker_data.back());
             if (!data.reader.Open(bam_file)){ throw "Could not open BAM file.."; }
             if (!data.reader.OpenIndex(bam_index_file)){ throw "Could not open BAM index file.."; }
-            
-            data.fr = fr;
-            
+
+            data.fr = new FastaReference();
+            data.fr->open(fasta_file);
+
             char filename_buffer[32];
             sprintf(filename_buffer, "repeatseq_vcf_temp_%03d.vcf", thread);
             data.vcfFilename = filename_buffer;
