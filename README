@@ -28,8 +28,8 @@ Command-line Options:
 	-pp         exclude reads that are not properly paired (for PE reads only)
 	-error      manually override the RepeatSeq error model and set a constant error rate [0.05]
     	-haploid    assume a haploid rather than diploid genome
-	-repeatseq  write .repeatseq file (**see pdf documentation for more information**)
-	-calls      write .calls file (**see pdf documentation for more information**)
+	-repeatseq  write .repeatseq file (**see below for more information**)
+	-calls      write .calls file (**see below for more information**)
 	-t          include user-defined tag in the output filename
 	-o          number of flanking bases to output from each read
 
