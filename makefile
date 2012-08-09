@@ -4,7 +4,7 @@ OBJS= repeatseq.o structures.o CLParse.o
 NAME= repeatseq
 
 $(NAME): $(OBJS)
-	g++ -o $@ $(OBJS) fastahack/Fasta.cpp fastahack/split.cpp -lbamtools -Lbamtools/lib 
+	g++ -o $@ $(OBJS) fastahack/Fasta.cpp fastahack/split.cpp -lpthread -lbamtools -Lbamtools/lib 
 
 # Suffix rules: tell how to  take file with first suffix and make it into
 #	file with second suffix

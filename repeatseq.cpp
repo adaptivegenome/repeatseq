@@ -26,12 +26,48 @@
 
 #include "repeatseq.h"
 #include <algorithm>
-vector<string> insertions;
-vector<string> insertionsQS;
+#include <pthread.h>
+#include <unistd.h>
+
 double log_factorial[100000] = {};
-BamReader reader;
 ofstream oFile, callsFile, vcfFile;
 string VERSION = "0.5.3";
+
+typedef struct worker_data {
+    worker_data(const SETTINGS_FILTERS & settings, const vector<string> & regions)
+    : settings(settings)
+    , regions(regions)
+    {}
+    FastaReference * fr;
+    ofstream vcfFile, oFile, callsFile;
+    string vcfFilename, oFilename, callsFilename;
+    const SETTINGS_FILTERS & settings;
+    const vector<string> & regions;
+    size_t region_start, region_stop;
+    pthread_t thread;
+    BamReader reader;
+} worker_data_t;
+
+void * worker_thread(void * pdata) {
+    worker_data_t & worker_data = *((worker_data_t *) pdata);
+    
+    worker_data.vcfFile.open(worker_data.vcfFilename.c_str());
+    if (worker_data.settings.makeRepeatseqFile)
+        worker_data.oFile.open(worker_data.oFilename.c_str());
+    if (worker_data.settings.makeCallsFile)
+        worker_data.callsFile.open(worker_data.callsFilename.c_str());
+    
+    for(size_t i = worker_data.region_start; i != worker_data.region_stop; i++)
+        print_output(worker_data.regions[i], worker_data.fr, worker_data.vcfFile, worker_data.oFile, worker_data.callsFile, worker_data.settings, worker_data.reader);
+    
+    worker_data.vcfFile.close();
+    if (worker_data.settings.makeRepeatseqFile)
+        worker_data.oFile.close();
+    if (worker_data.settings.makeCallsFile)
+        worker_data.callsFile.close();
+
+    return NULL;
+}
 
 int main(int argc, char* argv[]){	
 	try{
@@ -65,10 +101,6 @@ int main(int argc, char* argv[]){
 		}
 		FastaReference* fr = new FastaReference();
 		fr->open(fasta_file);
-		
-		//open BamReader object:
-		if (!reader.Open(bam_file)){ throw "Could not open BAM file.."; }
-		if (!reader.OpenIndex(bam_index_file)){ throw "Could not open BAM index file.."; }
 
 		//open input & output filestreams:
 		if (settings.makeRepeatseqFile){ oFile.open(output_filename.c_str()); }
@@ -80,10 +112,71 @@ int main(int argc, char* argv[]){
 		//print VCF header information:
 		printHeader(vcfFile);
 		
-		//go through the range file and run print_output() on the data from file
-		while(getline(range_file,region)) {
-			print_output(region, fr, vcfFile, oFile, callsFile, settings);
-		}
+        //read in the region file
+        vector<string> regions;
+		while(getline(range_file,region))
+            regions.push_back(region);
+        
+        long num_threads = sysconf(_SC_NPROCESSORS_ONLN);
+        vector<worker_data_t *> thread_worker_data;
+        
+        //set up threads to actually print the output
+        for(int thread = 0; thread != num_threads; thread++) {
+            thread_worker_data.push_back(new worker_data_t(settings, regions));
+            worker_data_t & data = *(thread_worker_data.back());
+            if (!data.reader.Open(bam_file)){ throw "Could not open BAM file.."; }
+            if (!data.reader.OpenIndex(bam_index_file)){ throw "Could not open BAM index file.."; }
+            
+            data.fr = fr;
+            
+            char filename_buffer[32];
+            sprintf(filename_buffer, "repeatseq_vcf_temp_%03d.vcf", thread);
+            data.vcfFilename = filename_buffer;
+            sprintf(filename_buffer, "repeatseq_o_temp_%03d.o", thread);
+            data.oFilename = filename_buffer;
+            sprintf(filename_buffer, "repeatseq_calls_temp_%03d.calls", thread);
+            data.callsFilename = filename_buffer;
+            
+            data.region_start = thread * (regions.size() / num_threads);
+            if(thread == num_threads - 1)
+                data.region_stop = regions.size();
+            else
+                data.region_stop = (thread+1) * (regions.size() / num_threads);
+        }
+        
+        //start worker threads
+        for(int thread = 0; thread != num_threads; thread++) {
+            if(0 != pthread_create(&thread_worker_data[thread]->thread, NULL, worker_thread, thread_worker_data[thread]))
+                perror("Error starting worker thread");
+        }
+        
+        //wait for all workers to finish
+        for(int thread = 0; thread != num_threads; thread++) {
+            if(0 != pthread_join(thread_worker_data[thread]->thread, NULL))
+                perror("Error closing worker thread");
+        }
+        
+        //consolidate results from the worker threads
+        for(int thread = 0; thread != num_threads; thread++) {
+            thread_worker_data.push_back(new worker_data_t(settings, regions));
+            worker_data_t & data = *thread_worker_data[thread];
+
+            ifstream in_vcf(data.vcfFilename.c_str(), ios::binary);
+            vcfFile << in_vcf.rdbuf();
+            remove(data.vcfFilename.c_str());
+
+            if (settings.makeRepeatseqFile) {
+                ifstream in_o(data.oFilename.c_str(), ios::binary);
+                oFile << in_o.rdbuf();
+                remove(data.oFilename.c_str());
+            }
+
+            if (settings.makeCallsFile) {
+                ifstream in_calls(data.callsFilename.c_str(), ios::binary);
+                callsFile << in_calls.rdbuf();
+                remove(data.callsFilename.c_str());
+            }
+        }
 	}
 	catch(const char* exOutput) {
 		cout << endl << exOutput << endl;
@@ -92,8 +185,7 @@ int main(int argc, char* argv[]){
 	}	
 }
 
-inline string parseCigar(stringstream &cigarSeq, string &alignedSeq, string &QS, int alignStart, int refStart, int LR_CHARS_TO_PRINT, double &avgBQ){
-	extern vector<string> insertions;
+inline string parseCigar(stringstream &cigarSeq, string &alignedSeq, string &QS, vector<string> & insertions, int alignStart, int refStart, int LR_CHARS_TO_PRINT, double &avgBQ){
 	int reserveSize = alignedSeq.length() + 500;
 
 	//reserve sufficient space (so iterators remain valid)
@@ -238,10 +330,9 @@ inline string parseCigar(stringstream &cigarSeq, string &alignedSeq, string &QS,
 	return temp; //return modified string
 }
 
-inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstream &tempFile/*fix*/, ofstream &callsFile, SETTINGS_FILTERS &settings){
-	extern vector<string> insertions;
-	extern vector<string> insertionsQS;
+inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstream &tempFile/*fix*/, ofstream &callsFile, const SETTINGS_FILTERS &settings, BamReader & reader){
 	
+	vector<string> insertions;
 	string sequence;                // holds reference sequence
 	string secondColumn;            // text string to the right of tab
 	int unitLength;
@@ -356,7 +447,6 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 	while (reader.GetNextAlignment(al)) {
 		//cout << " found\n";
 		insertions.clear();
-		insertionsQS.clear();
 		ssPrint.str("");
 		stringstream cigarSeq;
 		int gtBonus = 0;
@@ -376,7 +466,7 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 		
 		//run parseCigar:
 		double avgBQ;
-		PreAlignedPost = parseCigar(cigarSeq, al.QueryBases, al.Qualities, al.Position + 1, target.startPos, settings.LR_CHARS_TO_PRINT, avgBQ);
+		PreAlignedPost = parseCigar(cigarSeq, al.QueryBases, al.Qualities, insertions, al.Position + 1, target.startPos, settings.LR_CHARS_TO_PRINT, avgBQ);
 		if (PreAlignedPost == ""){ 
 			//If an 'N' or other problem was found
 			cout << "N found-- Possible Error!\n";
