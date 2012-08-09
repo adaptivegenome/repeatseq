@@ -30,7 +30,6 @@
 #include <unistd.h>
 
 double log_factorial[100000] = {};
-ofstream oFile, callsFile, vcfFile;
 string VERSION = "0.5.3";
 
 typedef struct worker_data {
@@ -69,7 +68,9 @@ void * worker_thread(void * pdata) {
     return NULL;
 }
 
-int main(int argc, char* argv[]){	
+int main(int argc, char* argv[]){
+    
+    ofstream oFile, callsFile, vcfFile;
 	try{
 		SETTINGS_FILTERS settings;	
 		srand( time(NULL) );
@@ -158,7 +159,6 @@ int main(int argc, char* argv[]){
         
         //consolidate results from the worker threads
         for(int thread = 0; thread != num_threads; thread++) {
-            thread_worker_data.push_back(new worker_data_t(settings, regions));
             worker_data_t & data = *thread_worker_data[thread];
 
             ifstream in_vcf(data.vcfFilename.c_str(), ios::binary);
@@ -330,7 +330,7 @@ inline string parseCigar(stringstream &cigarSeq, string &alignedSeq, string &QS,
 	return temp; //return modified string
 }
 
-inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstream &tempFile/*fix*/, ofstream &callsFile, const SETTINGS_FILTERS &settings, BamReader & reader){
+inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstream &oFile, ofstream &callsFile, const SETTINGS_FILTERS &settings, BamReader & reader){
 	
 	vector<string> insertions;
 	string sequence;                // holds reference sequence
