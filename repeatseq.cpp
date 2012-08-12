@@ -31,7 +31,7 @@ vector<string> insertionsQS;
 double log_factorial[100000] = {};
 BamReader reader;
 ofstream oFile, callsFile, vcfFile;
-string VERSION = "0.5.3";
+string VERSION = "0.6";
 
 int main(int argc, char* argv[]){	
 	try{
