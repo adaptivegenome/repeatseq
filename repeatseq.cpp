@@ -741,7 +741,7 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 	
 	//concordance = # of reads that support the majority GT / total number of reads
 	if (concordance < 0) oFile << "C:NA";
-	else oFile << " C:" << concordance;
+	else oFile << "C:" << concordance;
 	
 	oFile << " D:" << depth << " R:" << numReads << " S:" << numStars;
 	if (avgMapQ >= 0) oFile << " M:" << float(int(100*avgMapQ))/100;
@@ -755,6 +755,14 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 		oFile << "NA L:NA" << endl;
 		callsFile << "NA\tNA\n";
 	}
+        else if (vectorGT.size() > 5){          // if more than 5 GTs are present
+                oFile << "NA L:NA" << endl;
+                callsFile << "NA\tNA\n";
+        }
+        else if (concordance >= 0.8){
+                oFile << majGT << " L:50" << endl;
+                callsFile << majGT << "L:50" << endl;
+        }
 	else { 
 		vGT = printGenoPerc(vectorGT, target.length(), unitLength, conf, settings.mode); 
 		if (numReads <= 1){ conf = 0; }
@@ -854,7 +862,8 @@ inline vector<int> printGenoPerc(vector<GT> vectorGT, int ref_length, int unit_s
 	vector<int> gts;
 	stringstream toReturn;
 	extern int PHI_TABLE[5][5][5][2]; 
-	
+	extern bool manualErrorRate;
+
 	vectorGT.push_back(GT(0,0,0,0,0.0)); //allows locus to be considered homozygous
     	double pXtotal = 0;
     	string name;
@@ -872,12 +881,6 @@ inline vector<int> printGenoPerc(vector<GT> vectorGT, int ref_length, int unit_s
     	else if (mode == 2){ LOCAL_PHI = float(totalSum-(mostCommon+secondCommon))/totalSum; }
 	else{ LOCAL_PHI = 0; }
 	
-	if (vectorGT.size() == 2){ // reference has already been added so 2
-		confidence = 100;
-		gts.push_back(vectorGT.begin()->readlength);
-		return gts;
-	}
-	
     for (vector<GT>::iterator it = vectorGT.begin(); it < vectorGT.end(); ++it){
         for (vector<GT>::iterator jt = it+1; jt < vectorGT.end(); ++jt){
 	    int alleles = 1, errorOccurrences = 0;
@@ -888,7 +891,7 @@ inline vector<int> printGenoPerc(vector<GT> vectorGT, int ref_length, int unit_s
 	    
 	    stringstream tempss;
             if (jt->occurrences != 0) {
-                tempss << it->readlength <<  "h"  << jt->readlength;
+                tempss << it->readlength << "h" << jt->readlength;
                 alleles = 2;
                 name = tempss.str();
             }
@@ -903,53 +906,52 @@ inline vector<int> printGenoPerc(vector<GT> vectorGT, int ref_length, int unit_s
 		//determine likelihood:
 		int* ERROR_TABLE_1 = PHI_TABLE[unit_size-1][ref_length/15][int(it->avgBQ)];
 		int* ERROR_TABLE_2 = PHI_TABLE[unit_size-1][ref_length/15][int(jt->avgBQ)];
-		
-		ERROR_TABLE_1[0] = 1;
-		ERROR_TABLE_1[1] = 15;
-		ERROR_TABLE_2[0] = 1;
-		ERROR_TABLE_2[1] = 15;
+
 		int ERROR_1[2]; 
 		int ERROR_2[2];
 
+		// Set temporary error rate arrays
 		if (it->occurrences == 0){ ERROR_1[0] = 0; ERROR_1[1] = 0;}
-		else { ERROR_1[0] = ERROR_TABLE_1[0]; ERROR_1[1] = ERROR_TABLE_1[1];}
-		
+		else { ERROR_1[0] = ERROR_TABLE_1[1]; ERROR_1[1] = ERROR_TABLE_1[0];}
 		if (jt->occurrences == 0){ ERROR_2[0] = 0; ERROR_2[1] = 0;}
-		else { ERROR_2[0] = ERROR_TABLE_2[0]; ERROR_2[1] = ERROR_TABLE_2[1];}
+		else { ERROR_2[0] = ERROR_TABLE_2[1]; ERROR_2[1] = ERROR_TABLE_2[0];}
 
+		// Test if LOCAL error rate is greater than error rate from table
+		//  use the greater of the two
+		if (!manualErrorRate){
+			if (LOCAL_PHI > float(ERROR_1[0])/(ERROR_1[0] + ERROR_1[1])) {
+				ERROR_1[0] = LOCAL_PHI*20;
+				ERROR_1[1] = 20 - ERROR_1[0];
+			} 
+			if (LOCAL_PHI > float(ERROR_2[0])/(ERROR_2[0] + ERROR_2[1])) {
+				ERROR_2[0] = LOCAL_PHI*20;
+				ERROR_2[1] = 20 - ERROR_2[0];
+			}
+		} 
 
 		int v_numerator[3];
 		v_numerator[0] = 1 + ERROR_1[1] - ERROR_1[0] + it->occurrences;
 		v_numerator[1] = 1 + ERROR_2[1] - ERROR_2[0] + jt->occurrences;
 		v_numerator[2] = 1 + ERROR_1[0] + ERROR_2[0] + errorOccurrences; 
-		//cout << v_numerator[0] << " ";
-		//cout << v_numerator[1] << " ";
-		//cout << v_numerator[2] << "\n";
 
 		int v_denom[3];
 		v_denom[0] = 1 + ERROR_1[1] - ERROR_1[0];
 		v_denom[1] = 1 + ERROR_2[1] - ERROR_2[0];
 		v_denom[2] = 1 + ERROR_1[0] + ERROR_2[0]; 
-		//cout << v_denom[0] << " ";
-		//cout << v_denom[1] << " ";
-		//cout << v_denom[2] << "\n";
 		
+		// Calculate NUMERATOR & DENOMINATOR from arrays
 	    	double NUMERATOR = retBetaMult(v_numerator);
 		double DENOM = retBetaMult(v_denom);
-		//cout << log(retSumFactOverIndFact(it->occurrences,jt->occurrences,errorOccurrences)) << " + " << NUMERATOR << " - " << DENOM << endl;
-		//cout << exp(log(retSumFactOverIndFact(it->occurrences,jt->occurrences,errorOccurrences))+NUMERATOR-DENOM) << endl;
-		//cout << name << " --> " << "retSum(" << it->occurrences << ", " << jt->occurrences << ", " << errorOccurrences << ")" << endl << endl; // --> " << retSumFactOverIndFact(it->occurrences,jt->occurrences,errorOccurrences) << " * " << CHANCE_allele1 << " * " << CHANCE_allele2 << " * " << CHANCE_error << " == " << retSumFactOverIndFact(it->occurrences,jt->occurrences,errorOccurrences)*CHANCE_allele1*CHANCE_allele2*CHANCE_error << endl;
 		
 		//add genotype & likelihood to pXarray:
 		tagAndRead temp = tagAndRead(name, exp(log(retSumFactOverIndFact(it->occurrences,jt->occurrences,errorOccurrences))+NUMERATOR-DENOM));
 		pXarray.push_back(temp);
             	pXtotal += temp.m_pX;
-        }
+	}
     }
 	
     for (vector<tagAndRead>::iterator it = pXarray.begin(); it < pXarray.end(); ++it){
 		it->m_pX /= pXtotal;
-    		//cout << it->m_name << " --> " << it->m_pX << endl;
 	}
     
 	// sort, based on likelihood
@@ -970,7 +972,7 @@ inline vector<int> printGenoPerc(vector<GT> vectorGT, int ref_length, int unit_s
 	// set confidence value
 	confidence = -10*log10(1-pXarray.begin()->m_pX);
 	//cout << confidence << endl << endl;
-	if (confidence > 100) confidence = 100; //impose our upper bound to confidence..
+	if (confidence > 50) confidence = 50; //impose our upper bound to confidence..
 	
 	//check for NaN --> set to 0
 	if (confidence != confidence) {	confidence = 0;	}
