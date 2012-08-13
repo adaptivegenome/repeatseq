@@ -844,11 +844,11 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 		oFile << "NA L:NA" << endl;
 		callsFile << "NA\tNA\n";
 	}
-        else if (vectorGT.size() > 5){          // if more than 5 GTs are present
+        else if (vectorGT.size() > 9){          // if more than 9 GTs are present
                 oFile << "NA L:NA" << endl;
                 callsFile << "NA\tNA\n";
         }
-        else if (concordance >= 0.8){
+        else if (concordance >= 0.99){          //no need to compute confidence if all the reads agree
                 oFile << majGT << " L:50" << endl;
                 callsFile << majGT << "L:50" << endl;
         }
