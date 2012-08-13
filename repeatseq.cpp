@@ -30,7 +30,7 @@
 #include <unistd.h>
 
 double log_factorial[100000] = {};
-string VERSION = "0.6";
+string VERSION = "0.6.1";
 
 typedef struct worker_data {
     worker_data(const SETTINGS_FILTERS & settings, const vector<string> & regions)
