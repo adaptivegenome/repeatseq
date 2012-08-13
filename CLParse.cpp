@@ -39,6 +39,7 @@ int PHI_TABLE[5][5][5][2] = { { { { 177 , 7 } , { 234 , 15 } , { 991 , 76 } , { 
 }
 };
 
+bool manualErrorRate = false;
 
 void parseSettings(char *argv[], int argc, SETTINGS_FILTERS &settings, string &bam_file, string &fasta_file, string &position_file){
 	// repeatseq [options] <in.bam> <in.fasta> <in.regions>
@@ -87,6 +88,8 @@ void parseSettings(char *argv[], int argc, SETTINGS_FILTERS &settings, string &b
 			settings.LR_CHARS_TO_PRINT = atoi(argv[i]);
 		}
 		else if (sw == "-error") {
+			manualErrorRate = true;
+
 			//set PHI_TABLE
 			float constError = 0.05;
 			if (string(argv[i+1]).find('-') == -1){
@@ -96,8 +99,8 @@ void parseSettings(char *argv[], int argc, SETTINGS_FILTERS &settings, string &b
 			for (int w=0;w<5;++w){
 				for (int x=0; x<5; ++x){
 					for (int y=0; y<5; ++y){
-						PHI_TABLE[w][x][y][0] = int(100*constError);
-						PHI_TABLE[w][x][y][1] = int(100-100*constError);
+						PHI_TABLE[w][x][y][0] = int(100-100*constError);
+						PHI_TABLE[w][x][y][1] = int(100*constError);
 					}
 				}
 			}
