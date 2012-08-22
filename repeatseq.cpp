@@ -29,8 +29,8 @@
 #include <pthread.h>
 #include <unistd.h>
 
-double log_factorial[100000] = {};
-string VERSION = "0.6.2";
+double log_factorial[10000] = {};
+string VERSION = "0.6.3";
 
 typedef struct worker_data {
     worker_data(const SETTINGS_FILTERS & settings, const vector<string> & regions)
@@ -77,7 +77,9 @@ int main(int argc, char* argv[]){
 		string bam_file = "", fasta_file = "", position_file = "", region;
 		
 		//load log_factorial vector
-		for (int i=1,val=0 ; i < 100000; ++i){ 
+		//for (int i=1,val=0 ; i < 100000; ++i){ <--- this change breaks the code, val must be floating point 
+		double val = 0; 	
+		for (int i=1; i < 10000; ++i){ // scaled down to 10k for speed
 			val += log(i);
 			log_factorial[i] = val;
 		}
@@ -926,9 +928,10 @@ inline bool compareTAR(tagAndRead a, tagAndRead b){
     return (a.m_pX > b.m_pX);
 }
 
-inline double retBetaMult(int* vector){
+inline double retBetaMult(int* vector, int alleles){
 	double value = 1, sum = 0;
-        for (int i = 0; i < 3; ++i) {
+        // alleles + 1 --> 2 if homozygous, 3 if hetero
+        for (int i = 0; i < alleles + 1; ++i) {
 		value += log_factorial[vector[i]-1];
 		sum += vector[i];
 	}
@@ -1009,28 +1012,41 @@ inline vector<int> printGenoPerc(vector<GT> vectorGT, int ref_length, int unit_s
 		//  use the greater of the two
 		if (!manualErrorRate){
 			if (LOCAL_PHI > float(ERROR_1[0])/(ERROR_1[0] + ERROR_1[1])) {
-				ERROR_1[0] = LOCAL_PHI*20;
-				ERROR_1[1] = 20 - ERROR_1[0];
+				ERROR_1[0] = LOCAL_PHI*int(totalSum);
+				ERROR_1[1] = int(totalSum) - ERROR_1[0];
 			} 
 			if (LOCAL_PHI > float(ERROR_2[0])/(ERROR_2[0] + ERROR_2[1])) {
-				ERROR_2[0] = LOCAL_PHI*20;
-				ERROR_2[1] = 20 - ERROR_2[0];
+				ERROR_2[0] = LOCAL_PHI*int(totalSum);
+				ERROR_2[1] = int(totalSum) - ERROR_2[0];
 			}
 		} 
 
 		int v_numerator[3];
-		v_numerator[0] = 1 + ERROR_1[1] - ERROR_1[0] + it->occurrences;
-		v_numerator[1] = 1 + ERROR_2[1] - ERROR_2[0] + jt->occurrences;
-		v_numerator[2] = 1 + ERROR_1[0] + ERROR_2[0] + errorOccurrences; 
+                v_numerator[0] = 1 + ERROR_1[1] + it->occurrences;
+                v_numerator[1] = 1 + ERROR_2[1] + jt->occurrences;
+                if (alleles == 2){
+                        v_numerator[2] = 1 + ERROR_1[0] + ERROR_2[0] + errorOccurrences;
+                }
+                else {
+                        v_numerator[1] = 1 + ERROR_1[0] + ERROR_2[0] + errorOccurrences;
+                        v_numerator[2] = -1;
+                }
 
-		int v_denom[3];
-		v_denom[0] = 1 + ERROR_1[1] - ERROR_1[0];
-		v_denom[1] = 1 + ERROR_2[1] - ERROR_2[0];
-		v_denom[2] = 1 + ERROR_1[0] + ERROR_2[0]; 
-		
+                int v_denom[3];
+                v_denom[0] = 1 + ERROR_1[1];
+                v_denom[1] = 1 + ERROR_2[1];
+                if (alleles == 2){
+                        v_denom[2] = 1 + ERROR_1[0] + ERROR_2[0];
+                }
+                else {
+                        v_denom[1] = 1 + ERROR_1[0] + ERROR_2[0];
+                        v_denom[2] = -1;
+                }
+
+
 		// Calculate NUMERATOR & DENOMINATOR from arrays
-	    	double NUMERATOR = retBetaMult(v_numerator);
-		double DENOM = retBetaMult(v_denom);
+	    	double NUMERATOR = retBetaMult(v_numerator, alleles);
+		double DENOM = retBetaMult(v_denom, alleles);
 		
 		//add genotype & likelihood to pXarray:
 		tagAndRead temp = tagAndRead(name, exp(log(retSumFactOverIndFact(it->occurrences,jt->occurrences,errorOccurrences))+NUMERATOR-DENOM));
