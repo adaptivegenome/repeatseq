@@ -30,7 +30,7 @@
 #include <unistd.h>
 
 double log_factorial[10000] = {};
-string VERSION = "0.6.3";
+string VERSION = "0.6.4";
 
 typedef struct worker_data {
     worker_data(const SETTINGS_FILTERS & settings, const vector<string> & regions)
@@ -1010,16 +1010,16 @@ inline vector<int> printGenoPerc(vector<GT> vectorGT, int ref_length, int unit_s
 
 		// Test if LOCAL error rate is greater than error rate from table
 		//  use the greater of the two
-		if (!manualErrorRate){
-			if (LOCAL_PHI > float(ERROR_1[0])/(ERROR_1[0] + ERROR_1[1])) {
-				ERROR_1[0] = LOCAL_PHI*int(totalSum);
-				ERROR_1[1] = int(totalSum) - ERROR_1[0];
-			} 
-			if (LOCAL_PHI > float(ERROR_2[0])/(ERROR_2[0] + ERROR_2[1])) {
-				ERROR_2[0] = LOCAL_PHI*int(totalSum);
-				ERROR_2[1] = int(totalSum) - ERROR_2[0];
-			}
-		} 
+		//if (!manualErrorRate){
+		//	if (LOCAL_PHI > float(ERROR_1[0])/(ERROR_1[0] + ERROR_1[1])) {
+		//		ERROR_1[0] = LOCAL_PHI*int(totalSum);
+		//		ERROR_1[1] = int(totalSum) - ERROR_1[0];
+		//	} 
+		//	if (LOCAL_PHI > float(ERROR_2[0])/(ERROR_2[0] + ERROR_2[1])) {
+		//		ERROR_2[0] = LOCAL_PHI*int(totalSum);
+		//		ERROR_2[1] = int(totalSum) - ERROR_2[0];
+		//	}
+		//} 
 
 		int v_numerator[3];
                 v_numerator[0] = 1 + ERROR_1[1] + it->occurrences;
