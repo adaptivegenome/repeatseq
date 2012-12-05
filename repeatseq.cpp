@@ -842,7 +842,7 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 	callsFile << region << "\t" << secondColumn << "\t";
 	vector<int> vGT;
 	double conf = 0;
-	if (vectorGT.size()  == 0) {
+    if (vectorGT.size() == 0 || vectorGT[0].occurrences >= 10000) {        //if there is more than 10000x coverage, the data must be junk
 		oFile << "NA L:NA" << endl;
 		callsFile << "NA\tNA\n";
 	}
