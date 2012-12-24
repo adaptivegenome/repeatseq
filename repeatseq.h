@@ -6,6 +6,7 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <map>
 #include <vector>
 #include <iomanip>
 #include <stdio.h>
@@ -55,6 +56,7 @@ struct SETTINGS_FILTERS {
 	int MAX_READ_SIZE;
 	int LR_CHARS_TO_PRINT;
 	int mode;
+	bool emitAll;
 	bool multi;
 	bool properlyPaired;
 	bool makeRepeatseqFile;
@@ -70,6 +72,7 @@ struct SETTINGS_FILTERS {
 		LR_CHARS_TO_PRINT = 8;
 		MAX_READ_SIZE = 200;
 		mode = 2;
+		emitAll = false;
 		multi = false;
 		properlyPaired = false;
 		makeRepeatseqFile = false;
@@ -92,6 +95,7 @@ struct GT {
 	double avgBQ;
 
 	GT(int rl, int oc, int rev, int minF, double avg);
+    static bool sortByReadLength(const GT & a, const GT & b) { return (a.readlength > b.readlength); }
 };
 
 //counter struct is used in array for table files:
@@ -112,7 +116,7 @@ struct VCF_INFO {
 	int length;
 	int purity;
 	int depth;
-	double confidence;
+	bool emitAll;
 };
 
 //class for parsing region argument:
@@ -129,7 +133,7 @@ public:
 //function declarations:
 float fact(int);
 double retSumFactOverIndFact(int, int, int);
-string getVCF(string, string, string, int, char, bool, VCF_INFO);
+string getVCF(vector<string>, string, string, int, char, VCF_INFO, map<pair<int,int>,double> &);
 double PhredToFloat(char);
 string setToCD (string);
 bool fileCheck(string);
@@ -137,7 +141,7 @@ void buildFastaIndex(string);
 void printHeader(ofstream&);
 void parseSettings(char**, int, SETTINGS_FILTERS&, string&, string&, string&);
 void printArguments();
-vector<int> printGenoPerc(vector<GT>, int, int, double&, int);
+vector<int> printGenoPerc(vector<GT>, int, int, double&, int, map<pair<int, int>, double> &);
 bool fileCheck(string);
 void buildFastaIndex(string);
 void print_output(string, FastaReference*, ofstream&, ofstream&, ofstream&,  const SETTINGS_FILTERS&, BamReader&);

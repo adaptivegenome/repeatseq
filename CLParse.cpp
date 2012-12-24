@@ -109,7 +109,11 @@ void parseSettings(char *argv[], int argc, SETTINGS_FILTERS &settings, string &b
 			//set haploid/diploid mode
 			++i;
 			settings.mode = 1;
-		}			
+		}	
+		else if (sw == "-emitconfidentsites") {
+			++i;
+			settings.emitAll = 1;
+		}		
 
 		//FILTERS:
 		else if (sw == "-pp") {
@@ -168,6 +172,7 @@ void printArguments(){
 	cout << "\n\t -M\t\tminimum mapping quality for a read to be used for allele determination";
 	cout << "\n\t -multi\t\texclude reads flagged with the XT:A:R tag";
 	cout << "\n\t -pp\t\texclude reads that are not properly paired (for PE reads only)";
+	cout << "\n\t -emitconfidentsites\t\temit all confidence sites";
 	cout << "\n";
 	cout << "\n\t -error\t\tmanually override the RepeatSeq error model and set a constant error rate [0.05]";
 	cout << "\n\t -haploid\tassume a haploid rather than diploid genome";

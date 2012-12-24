@@ -30,7 +30,7 @@
 #include <unistd.h>
 
 double log_factorial[10000] = {};
-string VERSION = "0.6.5";
+string VERSION = "0.6.6";
 
 typedef struct worker_data {
     worker_data(const SETTINGS_FILTERS & settings, const vector<string> & regions)
@@ -782,6 +782,7 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 	int tallyMapQ = 0;
 	int occ = 0;
 	double avgMapQ;
+	map<pair<int,int>,double> likelihoods;
 	for (vector<STRING_GT>::iterator it=toPrint.begin(); it < toPrint.end(); ++it) {
 		tallyMapQ = tallyMapQ + it->MapQ;
 		++occ;
@@ -855,7 +856,7 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
                 callsFile << majGT << "L:50" << endl;
         }
 	else { 
-		vGT = printGenoPerc(vectorGT, target.length(), unitLength, conf, settings.mode); 
+		vGT = printGenoPerc(vectorGT, target.length(), unitLength, conf, settings.mode, likelihoods); 
 		if (numReads <= 1){ conf = 0; }
 		//write genotypes to calls & repeats file
 		if (vGT.size() == 0) { throw "vGT.size() == 0.. ERROR!\n"; }
@@ -872,13 +873,16 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 	INFO.length = target.length();
 	INFO.purity = purity;
 	INFO.depth = numReads;
-	INFO.confidence = conf;
+	INFO.emitAll = settings.emitAll;
 	
+	//build list of alternates
+	vector<string> alternates;
+	for (vector<STRING_GT>::iterator it=++toPrint.begin(); it < toPrint.end(); it++)
+		alternates.push_back(it->reads.alignedSeq);
+
 	// GO THROUGH VECTOR AND PRINT ALL REMAINING
 	if (toPrint.size()>1){ //if there are reads present..
 		string REF = toPrint[0].reads.alignedSeq;
-		bool homo = false;
-		if (vGT.size() == 1) homo = true;
 		
 		for (vector<STRING_GT>::iterator it=toPrint.begin(); it < toPrint.end(); it++) {
 			// print .repeats file:
@@ -886,18 +890,19 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 			
 			// finished printing to .repeats file.
 			if (vGT.size() != 0 && conf > 3.02){
-				if (vGT.size() > 1 || vGT[0] != target.length() /*there's been a mutation*/){
+				if (settings.emitAll || vGT.size() > 1 || vGT[0] != target.length() /*there's been a mutation*/){
 					// print .vcf file:
 					vector<int>::iterator tempgt = std::find(vGT.begin(), vGT.end(), it->GT);
-					if (tempgt != vGT.end() && it->GT != target.length()){
+					if (tempgt != vGT.end() && (settings.emitAll || it->GT != target.length())){
 						//debug vcf << "VCF record for " << REF << " --> " << it->reads.alignedSeq << "..\n";
 						
 						// the read represents one of our genotypes..
-						string vcfRecord = getVCF(it->reads.alignedSeq, REF, target.startSeq, target.startPos, *(leftReference.end()-1), homo, INFO);
+						string vcfRecord = getVCF(alternates, REF, target.startSeq, target.startPos, *(leftReference.end()-1), INFO, likelihoods);
 						vcf << vcfRecord;
 						
 						//remove the genotype from the genotype list..
-						vGT.erase( tempgt ); 
+						if(tempgt != vGT.end())
+							vGT.erase( tempgt ); 
 					}	
 					// finished printing to .vcf file. 
 				}
@@ -940,7 +945,7 @@ inline double retBetaMult(int* vector, int alleles){
 	
 }
 
-inline vector<int> printGenoPerc(vector<GT> vectorGT, int ref_length, int unit_size, double &confidence, int mode){
+inline vector<int> printGenoPerc(vector<GT> vectorGT, int ref_length, int unit_size, double &confidence, int mode, map<pair<int,int>,double> & likelihoods){
 	if (ref_length > 70) ref_length = 70;
 	if (unit_size > 5) unit_size = 5;
 	else if (unit_size < 1) unit_size = 1;
@@ -956,9 +961,10 @@ inline vector<int> printGenoPerc(vector<GT> vectorGT, int ref_length, int unit_s
 	extern int PHI_TABLE[5][5][5][2]; 
 	extern bool manualErrorRate;
 
+	sort(vectorGT.begin(), vectorGT.end(), GT::sortByReadLength);
+
 	vectorGT.push_back(GT(0,0,0,0,0.0)); //allows locus to be considered homozygous
     	double pXtotal = 0;
-    	string name;
     	
 	// Calculate LOCAL_PHI 
     	int mostCommon = 0, secondCommon = 0; double totalSum = 0;
@@ -974,6 +980,7 @@ inline vector<int> printGenoPerc(vector<GT> vectorGT, int ref_length, int unit_s
 	else{ LOCAL_PHI = 0; }
 	
     for (vector<GT>::iterator it = vectorGT.begin(); it < vectorGT.end(); ++it){
+    	string name;
         for (vector<GT>::iterator jt = it+1; jt < vectorGT.end(); ++jt){
 	    int alleles = 1, errorOccurrences = 0;
 	    double CHANCE_error = 1;
@@ -1057,21 +1064,38 @@ inline vector<int> printGenoPerc(vector<GT> vectorGT, int ref_length, int unit_s
 	
     for (vector<tagAndRead>::iterator it = pXarray.begin(); it < pXarray.end(); ++it){
 		it->m_pX /= pXtotal;
+		const string & name = it->m_name;
+
+		int hpos = name.find('h');
+		if (hpos == -1){
+			//homozygous..
+			int l1 = atoi(&name[0]);
+			likelihoods[pair<int,int>(l1, l1)] = -10*log10(1-it->m_pX);
+		}
+		else {
+			int l1 = atoi(&name[0]);
+			int l2 = atoi(&(name[hpos+1]));
+			if(l1 > l2)
+				swap(l1,l2);
+			//heterozygous...
+			likelihoods[pair<int,int>(l1, l2)] = -10*log10(1-it->m_pX);
+		}
 	}
     
 	// sort, based on likelihood
 	sort(pXarray.begin(), pXarray.end(), compareTAR);
 	
 	// set gts, based on sorted pXarray
-	int hpos = pXarray.begin()->m_name.find('h');
+	const string & name = pXarray.begin()->m_name;
+	int hpos = name.find('h');
 	if (hpos == -1){
 		//homozygous..
-		gts.push_back( atoi(pXarray.begin()->m_name.c_str()) );
+		gts.push_back( atoi(name.c_str()) );
 	}
 	else {
 		//heterozygous...
-		gts.push_back( atoi(pXarray.begin()->m_name.substr(0, hpos).c_str()) );
-		gts.push_back( atoi(pXarray.begin()->m_name.substr(hpos+1, -1).c_str()) );
+		gts.push_back( atoi(name.substr(0, hpos).c_str()) );
+		gts.push_back( atoi(name.substr(hpos+1, -1).c_str()) );
 	}
 	
 	// set confidence value
@@ -1126,60 +1150,210 @@ double retSumFactOverIndFact(int a, int b, int c){
 	return val;
 }
 
+pair<int,int> clip_common(vector<string>::iterator begin, vector<string>::iterator end) {
+	int clip_begin = 0, clip_end = 0;
+	//find how much we can clip
 
-string getVCF(string alignment, string reference, string chr, int start, char precBase, bool homozygous, VCF_INFO info){
-	stringstream vcf;
-	int begin, end = -1, bothInsOffset = 0;
-	
-	//assumes alignment & reference are the same length..
-	for(int index = alignment.length()-1; index >= 0; --index){
-		if ((alignment[index] != reference[index])){
-			if (alignment[index] == '-' || reference[index] == '-'){
-				end = index;
-				while (((alignment[index] != reference[index]) || alignment[index] == '-') && index >= 0){ index -= 1; }
-				begin = index;
-				while (index >= 0){
-					if (reference[index] == '-' && alignment[index] != '-'){ begin -= 1; }
-					else if (reference[index] == '-' && alignment[index] == '-'){ bothInsOffset += 1; }
-					index -= 1;
-				}
+	bool clip_this_one;
+
+	//clip all common letters at the end
+	do {
+		clip_this_one = true;
+		for(vector<string>::iterator i = begin; i != end; i++) {
+			if(0 == i->size() - clip_end - 1 || (*i)[i->size() - clip_end - 1] != (*begin)[begin->size() - clip_end - 1])
+				clip_this_one = false;
+
+			//don't clip the whole string!
+			if(i->size() == 1 + clip_end) {
+				clip_this_one = false;
 				break;
 			}
 		}
+
+		if(clip_this_one)
+			clip_end++;
+
+	} while(clip_this_one);
+
+	//clip all common letters from the beginning
+	do {
+		clip_this_one = true;
+		for(vector<string>::iterator i = begin; i != end && clip_this_one; i++) {
+			if(clip_begin == i->size() - clip_end - 1 ) {
+				clip_this_one = false;
+				break;
+			}
+			if((*i)[clip_begin] != (*begin)[clip_begin])
+				clip_this_one = false;
+		}
+
+		if(clip_this_one)
+			clip_begin++;
+
+	} while(clip_this_one);
+
+	//remove letters
+	for(vector<string>::iterator i = begin; i != end; i++) {
+		*i = i->substr(clip_begin, i->size() - clip_end - clip_begin);
+	//all sequences should have at least one common base at the beginning. We need to include at least one common base to comply with VCF spec.
+		assert(!i->empty());
 	}
+
+	return pair<int,int>(clip_begin, clip_end);
+}
+
+static bool orderStringBySize(const string & a, const string & b) {
+	return a.size() < b.size();
+}
+
+
+string getVCF(vector<string> alignments, string reference, string chr, int start, char precBase, VCF_INFO info, map<pair<int,int>,double> & likelihoods){
+	stringstream vcf;
 	
-	if (end == -1) { return ""; } // no difference was found..
-	
-	start += begin;
-	if (begin == -1) {
-		reference = precBase + reference.substr(0, end+1);
-		alignment = precBase + alignment.substr(0, end+1);
-	}
-	else{
-		//call getVCF to recursively get VCF for any indels earlier in the sequences...
-		vcf << getVCF(alignment.substr(0,begin), reference.substr(0,begin), chr, start-begin, precBase, homozygous, info);
-		
-		reference = reference.substr(begin, end-begin+1);
-		alignment = alignment.substr(begin, end-begin+1);
-	}
+	// return if no differences
+	bool differences = false;
+	for(vector<string>::const_iterator i = alignments.begin(); i != alignments.end(); i++) 
+		if(*i != *alignments.begin()) {
+			differences = true;
+			break;
+		}
+
+	if(!info.emitAll && !differences) return "";
+
 	
 	//remove -'s
+	map<string, int> dash_count;
 	reference.erase( std::remove(reference.begin(), reference.end(), '-'), reference.end() );
-	alignment.erase( std::remove(alignment.begin(), alignment.end(), '-'), alignment.end() );
+	for(vector<string>::iterator i = alignments.begin(); i != alignments.end(); i++) {
+		size_t length_before = i->size();
+		i->erase( std::remove(i->begin(), i->end(), '-'), i->end() );
+		dash_count[*i] = length_before - i->size();
+	}
+
+	//remove duplicate alignments
+	{
+		map<string, int> occurrences;
+
+		for(vector<string>::const_iterator i = alignments.begin(); i != alignments.end(); i++) {
+			if(occurrences.end() == occurrences.find(*i))
+				occurrences[*i] = 1;
+			else
+				occurrences[*i]++;
+		}
+
+		alignments.clear();
+
+		//eliminate everything but the most common allele of each length
+		while(!occurrences.empty()) {
+			string current_longest_allele = occurrences.begin()->first;
+			size_t count = occurrences.begin()->second;
+			occurrences.erase(occurrences.begin());
+			vector<map<string,int>::iterator> for_deletion;
+
+			// for each allele of the same length
+			for(map<string,int>::iterator i = occurrences.begin(); i != occurrences.end(); i++) {
+				if(i->first.size() == current_longest_allele.size()) {
+					//if this allele occurs more than any other allele, keep it
+					if(i->second > count) {
+						current_longest_allele = i->first;
+						count = i->second;
+					}
+					for_deletion.push_back(i);
+				}
+			}
+			// eliminate all alelles of the current length
+			for(vector<map<string,int>::iterator>::iterator i = for_deletion.begin(); i != for_deletion.end(); i++) {
+				occurrences.erase(*i);
+			}
+
+			alignments.push_back(current_longest_allele);
+		}
+	}
+
+	sort(alignments.begin(), alignments.end(), orderStringBySize);
 	
+	//find most likely gt
+	pair<int,int> most_likely_gt;
+	double most_likely_likelihood = -10000000;
+	for(map<pair<int,int>,double>::const_iterator i = likelihoods.begin(); i != likelihoods.end(); i++) {
+		if(i->second > most_likely_likelihood) {
+			most_likely_likelihood = i->second;
+			most_likely_gt = i->first;
+		}
+	}
+
+	alignments.push_back(reference);
+	for(vector<string>::iterator i = alignments.begin(); i != alignments.end(); i++) 
+		i->insert(i->begin(), precBase);
+	pair<int,int> clipped_length = clip_common(alignments.begin(), alignments.end());
+	reference = alignments.back();
+	alignments.pop_back();
+
+	int total_clip = clipped_length.first + clipped_length.second;
+
+	//find the reference's position
+	vector<string>::iterator reference_position = alignments.end();
+
 	vcf << chr << '\t';
-	vcf << start-bothInsOffset << '\t';
+	vcf << start - 1 + clipped_length.first << '\t';	// -1 adjusts for previous base being included
 	vcf << "." << '\t'; //ID
 	vcf << reference << '\t';
-	vcf << alignment << '\t';
-	vcf << info.confidence << '\t'; //qual -> -10log_10 prob(call in ALT is wrong)
-	if (info.confidence > 0.8) vcf << "PASS\t"; //filter
+	bool alignments_comma_printed = false;
+	for(vector<string>::iterator i = alignments.begin(); i != alignments.end(); i++) {
+		if(i->size() == reference.size())
+			reference_position = i;
+		else {
+			if(alignments_comma_printed)  vcf << ',';
+			else alignments_comma_printed = true;
+			vcf << *i;
+		}
+	}
+	if(alignments.empty())
+		vcf << ".\t";
+
+	vector<string>::iterator ref_loc = find(alignments.begin(), alignments.end(), reference);
+	if(ref_loc != alignments.end())
+		alignments.erase(ref_loc);
+
+	vcf << '\t';
+	vcf << min(max(most_likely_likelihood,0.),50.) << '\t';
+	if (most_likely_likelihood > 0.8) vcf << "PASS\t"; //filter
 	else vcf << ".\t";
-	vcf << "RU=" << info.unit << ";DP=" << info.depth << ";RL=" << info.length << "\t"; //info 
-	vcf << "GT\t"; //format
-	if (homozygous){ vcf << "1/1\n"; }
-	else{ vcf << "1/0\n"; }
-	
+	vcf << "AL=" << most_likely_gt.first - total_clip - (int)reference.size() + 1;
+	if(most_likely_gt.first != most_likely_gt.second)
+		vcf << "," << most_likely_gt.second - total_clip - (int)reference.size() + 1;
+	vcf << ";RU=" << info.unit << ";DP=" << info.depth << ";RL=" << info.length << "\t"; //info 
+	vcf << "GT:GL\t"; //format
+	for(int i = 0; i < alignments.size()+1; i++) {
+		int l1 = (i == 0 ? reference.size() : alignments[i-1].size()) - 1 + total_clip;
+		for(int j = i; j < alignments.size()+1; j++) {
+			int l2 = (j == 0 ? reference.size() : alignments[j-1].size()) - 1 + total_clip;
+			if(l1 == most_likely_gt.first && l2 == most_likely_gt.second) {
+				vcf<< i << "/" << j;
+				vcf << ":"; 
+			}
+		}
+	}
+
+
+	for(int i = 0; i < alignments.size()+1; i++) {
+		int l1 = (i == 0 ? reference.size() : alignments[i-1].size()) - 1 + total_clip;
+		for(int j = i; j < alignments.size()+1; j++) {
+			int l2 = (j == 0 ? reference.size() : alignments[j-1].size()) - 1 + total_clip;
+			if(i != 0 || j != 0)
+				vcf << ',';
+			double likelihood = likelihoods[pair<int,int>(l1,l2)];
+			likelihood = min(50., max(0., likelihood));
+			vcf << likelihood;
+			if(likelihoods.end() == likelihoods.find(pair<int,int>(l1,l2))) {
+				vcf << '!';
+			assert(0);
+			}
+		}
+	}
+
+	vcf << '\n';
+
 	return vcf.str();
 }
 
@@ -1215,6 +1389,8 @@ void buildFastaIndex(string fastaFileName){
 void printHeader(ofstream &vcf){
 	vcf << "##fileformat=VCFv4.0" << endl;
 	vcf << "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">" << endl;
+	vcf << "##FORMAT=<ID=GL,Number=G,Type=Float,Description=\"Genotype likelihood\">" << endl;
+	vcf << "##INFO=<ID=AL,Number=A,Type=Integer,Description=\"Allele Length(s)\">" << endl;
 	vcf << "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">" << endl;
 	vcf << "##INFO=<ID=RU,Number=1,Type=String,Description=\"Repeated Unit\">" << endl;
 	vcf << "##INFO=<ID=RL,Number=1,Type=Integer,Description=\"Reference Length of Microsatellite\">" << endl;
