@@ -172,9 +172,8 @@ void printArguments(){
 	cout << "\n\t -M\t\tminimum mapping quality for a read to be used for allele determination";
 	cout << "\n\t -multi\t\texclude reads flagged with the XT:A:R tag";
 	cout << "\n\t -pp\t\texclude reads that are not properly paired (for PE reads only)";
-	cout << "\n\t -emitconfidentsites\t\temit all confidence sites";
+	cout << "\n\t -emitconfidentsites\t\temit all confidence genotypes even if they do not vary from ref";
 	cout << "\n";
-	cout << "\n\t -error\t\tmanually override the RepeatSeq error model and set a constant error rate [0.05]";
 	cout << "\n\t -haploid\tassume a haploid rather than diploid genome";
 	cout << "\n";	
 	cout << "\n\t -repeatseq\twrite .repeatseq file containing additional information about reads";
