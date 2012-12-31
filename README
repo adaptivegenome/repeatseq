@@ -1,4 +1,4 @@
-RepeatSeq v0.6.5
+RepeatSeq v0.6.6
 
 1. Introduction
 RepeatSeq determines genotypes for microsatellite repeats in high-throughput sequencing data. RepeatSeq is available
@@ -30,7 +30,6 @@ Command-line Options:
 	-M          minimum mapping quality for a read to be used for allele determination
 	-multi      exclude reads flagged with the XT:A:R tag
 	-pp         exclude reads that are not properly paired (for PE reads only)
-	-error      manually override the RepeatSeq error model and set a constant error rate [0.05]
     	-haploid    assume a haploid rather than diploid genome
 	-repeatseq  write .repeatseq file (**see below for more information**)
 	-calls      write .calls file (**see below for more information**)
