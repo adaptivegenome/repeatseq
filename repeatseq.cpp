@@ -1311,9 +1311,8 @@ string getVCF(vector<string> alignments, string reference, string chr, int start
 	if(alignments.empty())
 		vcf << ".\t";
 
-	vector<string>::iterator ref_loc = find(alignments.begin(), alignments.end(), reference);
-	if(ref_loc != alignments.end())
-		alignments.erase(ref_loc);
+	if(reference_position != alignments.end())
+		alignments.erase(reference_position);
 
 	vcf << '\t';
 	vcf << min(max(most_likely_likelihood,0.),50.) << '\t';
@@ -1326,7 +1325,7 @@ string getVCF(vector<string> alignments, string reference, string chr, int start
 	vcf << "GT:GL\t"; //format
 	for(int i = 0; i < alignments.size()+1; i++) {
 		int l1 = (i == 0 ? reference.size() : alignments[i-1].size()) - 1 + total_clip;
-		for(int j = i; j < alignments.size()+1; j++) {
+		for(int j = 0; j < alignments.size()+1; j++) {
 			int l2 = (j == 0 ? reference.size() : alignments[j-1].size()) - 1 + total_clip;
 			if(l1 == most_likely_gt.first && l2 == most_likely_gt.second) {
 				vcf<< i << "/" << j;
@@ -1342,10 +1341,10 @@ string getVCF(vector<string> alignments, string reference, string chr, int start
 			int l2 = (j == 0 ? reference.size() : alignments[j-1].size()) - 1 + total_clip;
 			if(i != 0 || j != 0)
 				vcf << ',';
-			double likelihood = likelihoods[pair<int,int>(l1,l2)];
+			double likelihood = likelihoods[pair<int,int>(min(l1,l2), max(l1,l2))];
 			likelihood = min(50., max(0., likelihood));
 			vcf << likelihood;
-			if(likelihoods.end() == likelihoods.find(pair<int,int>(l1,l2))) {
+			if(likelihoods.end() == likelihoods.find(pair<int,int>(min(l1,l2), max(l1,l2)))) {
 				vcf << '!';
 			assert(0);
 			}
