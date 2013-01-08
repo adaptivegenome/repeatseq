@@ -1386,13 +1386,13 @@ void buildFastaIndex(string fastaFileName){
 }	
 
 void printHeader(ofstream &vcf){
-	vcf << "##fileformat=VCFv4.0" << endl;
+	vcf << "##fileformat=VCFv4.1" << endl;
 	vcf << "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">" << endl;
 	vcf << "##FORMAT=<ID=GL,Number=G,Type=Float,Description=\"Genotype likelihood\">" << endl;
-	vcf << "##INFO=<ID=AL,Number=A,Type=Integer,Description=\"Allele Length(s)\">" << endl;
+	vcf << "##INFO=<ID=AL,Number=A,Type=Integer,Description=\"Allele Length Offset(s)\">" << endl;
 	vcf << "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">" << endl;
-	vcf << "##INFO=<ID=RU,Number=1,Type=String,Description=\"Repeated Unit\">" << endl;
-	vcf << "##INFO=<ID=RL,Number=1,Type=Integer,Description=\"Reference Length of Microsatellite\">" << endl;
+	vcf << "##INFO=<ID=RU,Number=1,Type=String,Description=\"Repeat Unit\">" << endl;
+	vcf << "##INFO=<ID=RL,Number=1,Type=Integer,Description=\"Reference Length of Repeat\">" << endl;
 	vcf << "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tSAMPLE" << endl;
 }
 
