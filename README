@@ -43,7 +43,7 @@ Usage: repeatseq [options] <in.bam> <in.fasta> <in.regions>,
 If an improper command line option is found, RepeatSeq will exit and print usage information.
 
 6. Output Formats for RepeatSeq
-RepeatSeq can output a VCF file or two custom output formats: .REPEATSEQ and .CALLS. The VCF file is the only file produced by default, however the other two can be enabled through the “-repeatseq” and “-calls” command line options.
+RepeatSeq can output a VCF file or two custom output formats: .REPEATSEQ and .CALLS. The VCF file is the only file produced by default, however the other two can be enabled through the “-repeatseq” and “-calls” command line options. We are in the process of making 1000G calls and to faciliate this process we have recently revised our VCF output to meet 4.1 specs as well as the 1000G GT:GL format for genotypes and likelihoods.
 
 The .calls format is tab delimited and contains repeat annotations, genotypes and confidence values. The genotype field is “NA” when a genotype is not assigned, “N” if the genotype is homozygous with length N, or “NhM” if the genotype is heterozygous with lengths N and M. Similar to the QUAL field in the VCF format, the confidence field here is the phred-scaled quality score for the assertion made in the genotype field, i.e. it gives the value of -10log_10(p_incorrect-call); high values indicate high confidence calls. The TRF string is the concatenated output of Gary Benson's TRF.
 
