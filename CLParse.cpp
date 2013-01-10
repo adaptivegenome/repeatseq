@@ -107,11 +107,9 @@ void parseSettings(char *argv[], int argc, SETTINGS_FILTERS &settings, string &b
 		}
 		else if (sw == "-haploid") {
 			//set haploid/diploid mode
-			++i;
 			settings.mode = 1;
 		}	
 		else if (sw == "-emitconfidentsites") {
-			++i;
 			settings.emitAll = 1;
 		}		
 
