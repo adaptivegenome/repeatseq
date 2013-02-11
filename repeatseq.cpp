@@ -29,8 +29,22 @@
 #include <pthread.h>
 #include <unistd.h>
 
-double log_factorial[10000] = {};
-string VERSION = "0.7.1";
+//precalculate lower values of log factorial for speed.
+#define LOG_FACTORIAL_SIZE 10
+double log_factorial[LOG_FACTORIAL_SIZE] = {};
+string VERSION = "0.7.2";
+
+double getLogFactorial(int x) {
+	if(x < LOG_FACTORIAL_SIZE)
+		return log_factorial[x];
+	else {
+		double val = log_factorial[LOG_FACTORIAL_SIZE-1];
+		for (int i=LOG_FACTORIAL_SIZE-1; i < x; ++i) { // scaled down to 10k for speed
+			val += log(i);
+		}
+		return val;
+	}
+}
 
 typedef struct worker_data {
     worker_data(const SETTINGS_FILTERS & settings, const vector<string> & regions)
@@ -69,6 +83,7 @@ void * worker_thread(void * pdata) {
 }
 
 int main(int argc, char* argv[]){
+
     
     ofstream oFile, callsFile, vcfFile;
 	try{
@@ -77,9 +92,8 @@ int main(int argc, char* argv[]){
 		string bam_file = "", fasta_file = "", position_file = "", region;
 		
 		//load log_factorial vector
-		//for (int i=1,val=0 ; i < 100000; ++i){ <--- this change breaks the code, val must be floating point 
 		double val = 0; 	
-		for (int i=1; i < 10000; ++i){ // scaled down to 10k for speed
+		for (int i=1; i < LOG_FACTORIAL_SIZE; ++i){
 			val += log(i);
 			log_factorial[i] = val;
 		}
@@ -937,10 +951,10 @@ inline double retBetaMult(int* vector, int alleles){
 	double value = 1, sum = 0;
         // alleles + 1 --> 2 if homozygous, 3 if hetero
         for (int i = 0; i < alleles + 1; ++i) {
-		value += log_factorial[vector[i]-1];
+		value += getLogFactorial(vector[i]-1);
 		sum += vector[i];
 	}
-        value -= log_factorial[int(sum) - 1];
+        value -= getLogFactorial(int(sum) - 1);
 	return value;
 	
 }
