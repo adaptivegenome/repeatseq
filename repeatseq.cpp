@@ -32,7 +32,7 @@
 //precalculate lower values of log factorial for speed.
 #define LOG_FACTORIAL_SIZE 10
 double log_factorial[LOG_FACTORIAL_SIZE] = {};
-string VERSION = "0.7.2";
+string VERSION = "0.7.3";
 
 double getLogFactorial(int x) {
 	if(x < LOG_FACTORIAL_SIZE)
@@ -894,6 +894,8 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 	for (vector<STRING_GT>::iterator it=++toPrint.begin(); it < toPrint.end(); it++)
 		alternates.push_back(it->reads.alignedSeq);
 
+	bool printed = false;
+
 	// GO THROUGH VECTOR AND PRINT ALL REMAINING
 	if (toPrint.size()>1){ //if there are reads present..
 		string REF = toPrint[0].reads.alignedSeq;
@@ -907,11 +909,12 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 				if (settings.emitAll || vGT.size() > 1 || vGT[0] != target.length() /*there's been a mutation*/){
 					// print .vcf file:
 					vector<int>::iterator tempgt = std::find(vGT.begin(), vGT.end(), it->GT);
-					if (tempgt != vGT.end() && (settings.emitAll || it->GT != target.length())){
+					if (!printed && tempgt != vGT.end() && (settings.emitAll || it->GT != target.length())){
 						//debug vcf << "VCF record for " << REF << " --> " << it->reads.alignedSeq << "..\n";
 						
 						// the read represents one of our genotypes..
 						string vcfRecord = getVCF(alternates, REF, target.startSeq, target.startPos, *(leftReference.end()-1), INFO, likelihoods);
+						printed = true;
 						vcf << vcfRecord;
 						
 						//remove the genotype from the genotype list..
