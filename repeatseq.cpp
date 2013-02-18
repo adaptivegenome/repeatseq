@@ -32,7 +32,7 @@
 //precalculate lower values of log factorial for speed.
 #define LOG_FACTORIAL_SIZE 10
 double log_factorial[LOG_FACTORIAL_SIZE] = {};
-string VERSION = "0.7.3";
+string VERSION = "0.7.5";
 
 double getLogFactorial(int x) {
 	if(x < LOG_FACTORIAL_SIZE)
