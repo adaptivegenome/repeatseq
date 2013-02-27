@@ -144,7 +144,7 @@ void printArguments();
 vector<int> printGenoPerc(vector<GT>, int, int, double&, int, map<pair<int, int>, double> &);
 bool fileCheck(string);
 void buildFastaIndex(string);
-void print_output(string, FastaReference*, ofstream&, ofstream&, ofstream&,  const SETTINGS_FILTERS&, BamReader&);
+void print_output(string, FastaReference*, stringstream&, stringstream&, stringstream&,  const SETTINGS_FILTERS&, BamReader&);
 
 inline bool vectorGTsort(GT a, GT b) { return (a.occurrences > b.occurrences); }
 

@@ -29,10 +29,15 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#include <sstream>
+#include <string>
+
+using namespace std;
+
 //precalculate lower values of log factorial for speed.
 #define LOG_FACTORIAL_SIZE 10
 double log_factorial[LOG_FACTORIAL_SIZE] = {};
-string VERSION = "0.7.5";
+string VERSION = "0.8";
 
 double getLogFactorial(int x) {
 	if(x < LOG_FACTORIAL_SIZE)
@@ -52,8 +57,7 @@ typedef struct worker_data {
     , regions(regions)
     {}
     FastaReference * fr;
-    ofstream vcfFile, oFile, callsFile;
-    string vcfFilename, oFilename, callsFilename;
+    stringstream vcfFile, oFile, callsFile;
     const SETTINGS_FILTERS & settings;
     const vector<string> & regions;
     size_t region_start, region_stop;
@@ -64,20 +68,8 @@ typedef struct worker_data {
 void * worker_thread(void * pdata) {
     worker_data_t & worker_data = *((worker_data_t *) pdata);
     
-    worker_data.vcfFile.open(worker_data.vcfFilename.c_str());
-    if (worker_data.settings.makeRepeatseqFile)
-        worker_data.oFile.open(worker_data.oFilename.c_str());
-    if (worker_data.settings.makeCallsFile)
-        worker_data.callsFile.open(worker_data.callsFilename.c_str());
-    
     for(size_t i = worker_data.region_start; i != worker_data.region_stop; i++)
         print_output(worker_data.regions[i], worker_data.fr, worker_data.vcfFile, worker_data.oFile, worker_data.callsFile, worker_data.settings, worker_data.reader);
-    
-    worker_data.vcfFile.close();
-    if (worker_data.settings.makeRepeatseqFile)
-        worker_data.oFile.close();
-    if (worker_data.settings.makeCallsFile)
-        worker_data.callsFile.close();
 
     return NULL;
 }
@@ -145,14 +137,6 @@ int main(int argc, char* argv[]){
             data.fr = new FastaReference();
             data.fr->open(fasta_file);
 
-            char filename_buffer[32];
-            sprintf(filename_buffer, "repeatseq_vcf_temp_%03d.vcf", thread);
-            data.vcfFilename = filename_buffer;
-            sprintf(filename_buffer, "repeatseq_o_temp_%03d.o", thread);
-            data.oFilename = filename_buffer;
-            sprintf(filename_buffer, "repeatseq_calls_temp_%03d.calls", thread);
-            data.callsFilename = filename_buffer;
-            
             data.region_start = thread * (regions.size() / num_threads);
             if(thread == num_threads - 1)
                 data.region_stop = regions.size();
@@ -175,21 +159,16 @@ int main(int argc, char* argv[]){
         //consolidate results from the worker threads
         for(int thread = 0; thread != num_threads; thread++) {
             worker_data_t & data = *thread_worker_data[thread];
+        
+            if(data.vcfFile.rdbuf()->in_avail())
+                vcfFile << data.vcfFile.rdbuf();
 
-            ifstream in_vcf(data.vcfFilename.c_str(), ios::binary);
-            vcfFile << in_vcf.rdbuf();
-            remove(data.vcfFilename.c_str());
-
-            if (settings.makeRepeatseqFile) {
-                ifstream in_o(data.oFilename.c_str(), ios::binary);
-                oFile << in_o.rdbuf();
-                remove(data.oFilename.c_str());
+            if (data.oFile.rdbuf()->in_avail() && settings.makeRepeatseqFile) {
+                oFile << data.oFile.rdbuf();
             }
 
-            if (settings.makeCallsFile) {
-                ifstream in_calls(data.callsFilename.c_str(), ios::binary);
-                callsFile << in_calls.rdbuf();
-                remove(data.callsFilename.c_str());
+            if (data.callsFile.rdbuf()->in_avail() && settings.makeCallsFile) {
+                callsFile << data.callsFile.rdbuf();
             }
         }
 	}
@@ -345,7 +324,7 @@ inline string parseCigar(stringstream &cigarSeq, string &alignedSeq, string &QS,
 	return temp; //return modified string
 }
 
-inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstream &oFile, ofstream &callsFile, const SETTINGS_FILTERS &settings, BamReader & reader){
+inline void print_output(string region,FastaReference* fr, stringstream &vcf,  stringstream &oFile, stringstream &callsFile, const SETTINGS_FILTERS &settings, BamReader & reader){
 	
 	vector<string> insertions;
 	string sequence;                // holds reference sequence
@@ -862,12 +841,13 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 		callsFile << "NA\tNA\n";
 	}
         else if (vectorGT.size() > 9){          // if more than 9 GTs are present
-                oFile << "NA L:NA" << endl;
-                callsFile << "NA\tNA\n";
+            oFile << "NA L:NA" << endl;
+            callsFile << "NA\tNA\n";
         }
         else if (concordance >= 0.99){          //no need to compute confidence if all the reads agree
-                oFile << majGT << " L:50" << endl;
-                callsFile << majGT << "L:50" << endl;
+            oFile << majGT << " L:50" << endl;
+            callsFile << majGT << "L:50" << endl;
+            conf = 1;
         }
 	else { 
 		vGT = printGenoPerc(vectorGT, target.length(), unitLength, conf, settings.mode, likelihoods); 
@@ -896,21 +876,19 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 
 	bool printed = false;
 
+	string & REF = toPrint[0].reads.alignedSeq;
 	// GO THROUGH VECTOR AND PRINT ALL REMAINING
 	if (toPrint.size()>1){ //if there are reads present..
-		string REF = toPrint[0].reads.alignedSeq;
-		
 		for (vector<STRING_GT>::iterator it=toPrint.begin(); it < toPrint.end(); it++) {
 			// print .repeats file:
 			oFile << it->reads.preSeq << " " << it->reads.alignedSeq << " " << it->reads.postSeq << it->print;
-			
 			// finished printing to .repeats file.
-			if (vGT.size() != 0 && conf > 3.02){
+			if ((vGT.size() != 0 && conf > 3.02) || (concordance >= 0.99 && settings.emitAll)){
 				if (settings.emitAll || vGT.size() > 1 || vGT[0] != target.length() /*there's been a mutation*/){
 					// print .vcf file:
 					vector<int>::iterator tempgt = std::find(vGT.begin(), vGT.end(), it->GT);
 					if (!printed && tempgt != vGT.end() && (settings.emitAll || it->GT != target.length())){
-						//debug vcf << "VCF record for " << REF << " --> " << it->reads.alignedSeq << "..\n";
+						//vcf << "VCF record for " << REF << " --> " << it->reads.alignedSeq << "..\n";
 						
 						// the read represents one of our genotypes..
 						string vcfRecord = getVCF(alternates, REF, target.startSeq, target.startPos, *(leftReference.end()-1), INFO, likelihoods);
@@ -928,6 +906,14 @@ inline void print_output(string region,FastaReference* fr, ofstream &vcf,  ofstr
 			// continue iterating through each read..
 		}
 	}
+	if(!printed && concordance == 1) {
+		if((concordance == -1. || concordance >= 0.99) && settings.emitAll && !printed) {
+			likelihoods[pair<int,int>(0,0)] = 50;
+			vcf << getVCF(alternates, REF, target.startSeq, target.startPos, *(leftReference.end()-1), INFO, likelihoods);
+			printed = true;
+		}
+	}
+	assert(!vcf.fail());
 	
 	return;
 }
@@ -1299,10 +1285,13 @@ string getVCF(vector<string> alignments, string reference, string chr, int start
 		}
 	}
 
+	if(most_likely_gt.first == 0) most_likely_gt.first = reference.length();
+	if(most_likely_gt.second == 0) most_likely_gt.second = reference.length();
+
 	alignments.push_back(reference);
 	for(vector<string>::iterator i = alignments.begin(); i != alignments.end(); i++) 
 		i->insert(i->begin(), precBase);
-	pair<int,int> clipped_length = clip_common(alignments.begin(), alignments.end());
+	pair<int,int> clipped_length(0,0);//t  = clip_common(alignments.begin(), alignments.end());
 	reference = alignments.back();
 	alignments.pop_back();
 
@@ -1325,19 +1314,19 @@ string getVCF(vector<string> alignments, string reference, string chr, int start
 			vcf << *i;
 		}
 	}
-	if(alignments.empty())
-		vcf << ".\t";
-
 	if(reference_position != alignments.end())
 		alignments.erase(reference_position);
+	if(alignments.empty())
+		vcf << ".";
 
 	vcf << '\t';
 	vcf << min(max(most_likely_likelihood,0.),50.) << '\t';
 	if (most_likely_likelihood > 0.8) vcf << "PASS\t"; //filter
 	else vcf << ".\t";
+//vcf << endl << "$ mlgt.first: " << most_likely_gt.first << " total_clip " << total_clip << " ref_size: " << reference.size() << " total " << most_likely_gt.first - total_clip - (int)reference.size() << endl;
 	vcf << "AL=" << most_likely_gt.first - total_clip - (int)reference.size() + 1;
-	if(most_likely_gt.first != most_likely_gt.second)
-		vcf << "," << most_likely_gt.second - total_clip - (int)reference.size() + 1;
+	//if(most_likely_gt.first != most_likely_gt.second)
+	vcf << "," << most_likely_gt.second - total_clip - (int)reference.size() + 1;
 	vcf << ";RU=" << info.unit << ";DP=" << info.depth << ";RL=" << info.length << "\t"; //info 
 	vcf << "GT:GL\t"; //format
 	for(int i = 0; i < alignments.size()+1; i++) {
@@ -1350,23 +1339,26 @@ string getVCF(vector<string> alignments, string reference, string chr, int start
 			}
 		}
 	}
+    if(alignments.empty()) {
+        vcf << "50";
+    } else {
 
-
-	for(int i = 0; i < alignments.size()+1; i++) {
-		int l1 = (i == 0 ? reference.size() : alignments[i-1].size()) - 1 + total_clip;
-		for(int j = i; j < alignments.size()+1; j++) {
-			int l2 = (j == 0 ? reference.size() : alignments[j-1].size()) - 1 + total_clip;
-			if(i != 0 || j != 0)
-				vcf << ',';
-			double likelihood = likelihoods[pair<int,int>(min(l1,l2), max(l1,l2))];
-			likelihood = min(50., max(0., likelihood));
-			vcf << likelihood;
-			if(likelihoods.end() == likelihoods.find(pair<int,int>(min(l1,l2), max(l1,l2)))) {
-				vcf << '!';
-			assert(0);
-			}
-		}
-	}
+        for(int i = 0; i < alignments.size()+1; i++) {
+            int l1 = (i == 0 ? reference.size() : alignments[i-1].size()) - 1 + total_clip;
+            for(int j = i; j < alignments.size()+1; j++) {
+                int l2 = (j == 0 ? reference.size() : alignments[j-1].size()) - 1 + total_clip;
+                if(i != 0 || j != 0)
+                    vcf << ',';
+                double likelihood = likelihoods[pair<int,int>(min(l1,l2), max(l1,l2))];
+                likelihood = min(50., max(0., likelihood));
+                vcf << likelihood;
+                if(likelihoods.end() == likelihoods.find(pair<int,int>(min(l1,l2), max(l1,l2)))) {
+                    vcf << '!';
+                assert(0);
+                }
+            }
+        }
+    }
 
 	vcf << '\n';
 
