@@ -37,7 +37,7 @@ using namespace std;
 //precalculate lower values of log factorial for speed.
 #define LOG_FACTORIAL_SIZE 10
 double log_factorial[LOG_FACTORIAL_SIZE] = {};
-string VERSION = "0.8";
+string VERSION = "0.8.1";
 
 double getLogFactorial(int x) {
 	if(x < LOG_FACTORIAL_SIZE)
@@ -908,7 +908,13 @@ inline void print_output(string region,FastaReference* fr, stringstream &vcf,  s
 	}
 	if(!printed && concordance == 1) {
 		if((concordance == -1. || concordance >= 0.99) && settings.emitAll && !printed) {
-			likelihoods[pair<int,int>(0,0)] = 50;
+
+			//remove dashes so we can get the real length
+			string alternate = alternates.front();
+			while(alternate.end() != find(alternate.begin(), alternate.end(), '-'))
+				alternate.erase(find(alternate.begin(), alternate.end(), '-'));
+			int gt_index = (REF == alternate) ? REF.size() : alternate.size();
+			likelihoods[pair<int,int>(gt_index,gt_index)] = 50;
 			vcf << getVCF(alternates, REF, target.startSeq, target.startPos, *(leftReference.end()-1), INFO, likelihoods);
 			printed = true;
 		}
@@ -1287,6 +1293,11 @@ string getVCF(vector<string> alignments, string reference, string chr, int start
 
 	if(most_likely_gt.first == 0) most_likely_gt.first = reference.length();
 	if(most_likely_gt.second == 0) most_likely_gt.second = reference.length();
+	if(!alignments.empty()&& likelihoods.size() == 1 
+		&& likelihoods.end() != likelihoods.find( pair<int,int>(alignments[0].length(), alignments[0].length())) ) {
+		if(most_likely_gt.first == 1) most_likely_gt.first = alignments[0].length();
+		if(most_likely_gt.second == 1) most_likely_gt.second = alignments[0].length();
+	}
 
 	alignments.push_back(reference);
 	for(vector<string>::iterator i = alignments.begin(); i != alignments.end(); i++) 
