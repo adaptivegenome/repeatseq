@@ -37,7 +37,7 @@ using namespace std;
 //precalculate lower values of log factorial for speed.
 #define LOG_FACTORIAL_SIZE 10
 double log_factorial[LOG_FACTORIAL_SIZE] = {};
-string VERSION = "0.8.1";
+string VERSION = "0.8.2";
 
 double getLogFactorial(int x) {
 	if(x < LOG_FACTORIAL_SIZE)
@@ -1356,7 +1356,7 @@ string getVCF(vector<string> alignments, string reference, string chr, int start
 
         for(int i = 0; i < alignments.size()+1; i++) {
             int l1 = (i == 0 ? reference.size() : alignments[i-1].size()) - 1 + total_clip;
-            for(int j = i; j < alignments.size()+1; j++) {
+            for(int j = 0; j < i+1; j++) {
                 int l2 = (j == 0 ? reference.size() : alignments[j-1].size()) - 1 + total_clip;
                 if(i != 0 || j != 0)
                     vcf << ',';
