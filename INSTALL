@@ -15,4 +15,8 @@ $ make
 $ cd ../..
 $ make
 
-For help, please contact evolvability@vt.edu.
+Update:
+Some folks have reported the following error after following the above instructions:
+error while loading shared libraries: libbamtools.so.2.3.0: cannot open shared object file: No such file or directory
+
+Adding the bamtools path to LD_LIBRARY_PATH will resovle this issue.
